@@ -138,10 +138,15 @@ def write_dashboard() -> None:
         DASHBOARD_FILE,
         (TEMPLATE_DIR / "homelab.yaml").read_text(encoding="utf-8"),
     )
-    atomic_write(
-        CONFIG_DIR / "dashboards/views/server.yaml",
-        (TEMPLATE_DIR / "views/server.yaml").read_text(encoding="utf-8"),
-    )
+    # Sync every static view automatically. Keep EcoFlow special because its
+    # @ecoflow_* placeholders must first be resolved from the entity registry.
+    for source in sorted((TEMPLATE_DIR / "views").glob("*.yaml")):
+        if source.name == "ecoflow.yaml":
+            continue
+        atomic_write(
+            CONFIG_DIR / "dashboards/views" / source.name,
+            source.read_text(encoding="utf-8"),
+        )
 
     ecoflow_template = yaml.safe_load(
         (TEMPLATE_DIR / "views/ecoflow.yaml").read_text(encoding="utf-8")
