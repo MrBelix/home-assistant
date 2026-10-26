@@ -45,6 +45,32 @@ docker inspect homeassistant --format '{{range .Mounts}}{{if eq .Destination "/c
 
 Авторизацію в EcoFlow та Beszel виконуємо **один раз через UI**, вона зберігається в `/config`, а не в Git. Паролі й токени **ніколи не комітимо**.
 
+## Homelab dashboard (Server + EcoFlow)
+
+Під час старту образ автоматично створює `/config/dashboards/homelab.yaml` із шаблону `dashboards/homelab.yaml` у цьому репозиторії. У дашборді є дві вкладки:
+
+- **mi-server** — CPU, RAM, диски, температура, батарея ноутбука, мережа, uptime, історія навантаження. Використовуються фактичні entity_id з твого Beszel.
+- **EcoFlow** — заряд, вхідна/вихідна потужність, залишок часу, здоров'я батареї, доступні AC/DC перемикачі й графік потужності. Entity ID автоматично знаходяться в реєстрі Home Assistant за інтеграцією `ecoflow_cloud`, тож їх не треба вручну копіювати.
+
+Дашборд у звичайній конфігурації з'явиться в боковому меню **Homelab** після успішного деплою та перезапуску Home Assistant.
+
+Якщо `configuration.yaml` ще **не** містить власного ключа `lovelace:`, стартовий скрипт додасть декларацію YAML-дашборда одноразово, зберігши резервну копію `/config/configuration.yaml.before-homelab`. Він не змінює наявні користувацькі налаштування Lovelace.
+
+Якщо `lovelace:` уже є, реєстрацію навмисно пропущено, щоб не перезаписати налаштування. Додай вручну під наявне `lovelace.dashboards`:
+
+```yaml
+homelab-server:
+  mode: yaml
+  filename: dashboards/homelab.yaml
+  title: Homelab
+  icon: mdi:server
+  show_in_sidebar: true
+```
+
+Після додавання нових EcoFlow-пристроїв потрібен **перезапуск Home Assistant**, щоб регенерувати список сутностей у вкладці EcoFlow. Ручні зміни у згенерованому файлі `/config/dashboards/homelab.yaml` будуть перезаписані при наступному запуску — змінюй Git-шаблон і скрипт натомість.
+
+Рекомендовано зробити резервну копію `/config` перед деплоєм; це також захистить збережені авторизації EcoFlow та Beszel.
+
 ## Оновлення
 
 Версії сторонніх інтеграцій закріплено commit SHA у `Dockerfile`. Для оновлення зміни відповідні `ARG`, перевір релізи та зроби новий деплой. Перезапуск контейнера також синхронізує код інтеграцій з образу, тож **не оновлюй ці дві інтеграції через HACS** — наступний запуск перезапише їх код.
@@ -57,10 +83,13 @@ docker inspect homeassistant --format '{{range .Mounts}}{{if eq .Destination "/c
 .
 ├── Dockerfile
 ├── compose.yaml
+├── dashboards/
+│   └── homelab.yaml
 ├── .env.example
 ├── .dockerignore
 └── scripts/
-    └── sync-integrations.sh
+    ├── sync-integrations.sh
+    └── register-dashboard.py
 ```
 
 Цей репозиторій містить конфігурацію для деплою, **не самі дані Home Assistant**. Для відновлення після перевстановлення Debian обов'язкова окрема резервна копія `/config`.
