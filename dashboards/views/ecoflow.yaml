@@ -48,6 +48,29 @@ cards:
       - entity: "@ecoflow_dc"
         name: DC 12V вихід
 
+  - type: entities
+    title: Мережеве живлення
+    show_header_toggle: false
+    entities:
+      - entity: "@ecoflow_ac_voltage"
+        name: Напруга на AC-вході
+
+  - type: history-graph
+    title: Історія відключень · останні 72 години
+    hours_to_show: 72
+    min_y_axis: 0
+    max_y_axis: 250
+    entities:
+      - entity: "@ecoflow_ac_voltage"
+        name: AC-вхід EcoFlow (В)
+
+  - type: markdown
+    content: |
+      **Як читати графік:** близько 230 В — напруга на вході EcoFlow є;
+      0 В — зникла. Це не гарантує, що світло зникло в усій оселі:
+      станція повинна бути постійно підключена до розетки.
+      За відсутності даних EcoFlow час відключення може бути невідомим.
+
   - type: history-graph
     title: Потужність за 24 години
     hours_to_show: 24
