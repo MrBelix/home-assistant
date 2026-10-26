@@ -1,4 +1,7 @@
 # Integration sources are resolved during build, never at container start.
+# This ARG must be global because it is referenced in a FROM instruction.
+ARG HOME_ASSISTANT_IMAGE=ghcr.io/home-assistant/home-assistant:stable
+
 FROM alpine:3.22 AS integration_sources
 
 RUN apk add --no-cache ca-certificates curl tar
@@ -19,7 +22,6 @@ RUN set -eux; \
     test -f /src/ecoflow/custom_components/ecoflow_cloud/manifest.json; \
     test -f /src/beszel/custom_components/beszel/manifest.json
 
-ARG HOME_ASSISTANT_IMAGE=ghcr.io/home-assistant/home-assistant:stable
 FROM ${HOME_ASSISTANT_IMAGE}
 
 COPY --from=integration_sources /src/ecoflow/custom_components/ecoflow_cloud/ /opt/ha-integrations/ecoflow_cloud/
