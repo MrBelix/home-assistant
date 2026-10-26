@@ -62,7 +62,7 @@ def register_packages() -> None:
 
     # For ordinary block-style homeassistant: insert a nested package include.
     # For inline / !include root settings, require manual action instead.
-    match = re.search(r"(?m)^homeassistant:\s*(?:#.*)?$", original)
+    match = re.search(r"(?m)^homeassistant:[ \t]*(?:#.*)?$", original)
     if match:
         updated = original[: match.end()] + "\n" + PACKAGES_LINE + original[match.end():]
     elif re.search(r"(?m)^homeassistant\s*:", original):
