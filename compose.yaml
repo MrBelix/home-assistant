@@ -1,0 +1,22 @@
+services:
+  homeassistant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: homeassistant
+    restart: unless-stopped
+    stop_grace_period: 60s
+    network_mode: host
+    privileged: true
+    environment:
+      TZ: Europe/Kyiv
+    volumes:
+      - ha_config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+
+volumes:
+  ha_config:
+    external: true
+    # Never create a new, empty volume when migrating an existing HA installation.
+    name: ${HA_CONFIG_VOLUME:?Set HA_CONFIG_VOLUME to the existing Docker volume mounted at /config}
