@@ -1,0 +1,58 @@
+title: EcoFlow
+path: power
+icon: mdi:battery-charging
+type: masonry
+cards:
+  - type: markdown
+    content: |
+      ## EcoFlow River 2
+      Заряд, споживання та електроживлення.
+
+  # "@ecoflow_*" values are placeholders resolved from the HA entity registry
+  # by scripts/register-dashboard.py when the container starts.
+  - type: gauge
+    entity: "@ecoflow_battery"
+    name: Заряд батареї
+    min: 0
+    max: 100
+    severity:
+      red: 0
+      yellow: 20
+      green: 50
+
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: tile
+        entity: "@ecoflow_input"
+        name: Вхідна потужність
+      - type: tile
+        entity: "@ecoflow_output"
+        name: Споживання
+      - type: tile
+        entity: "@ecoflow_remaining"
+        name: Автономність
+      - type: tile
+        entity: "@ecoflow_health"
+        name: Стан батареї
+
+  - type: entities
+    title: Керування та стан
+    show_header_toggle: false
+    entities:
+      - entity: "@ecoflow_status"
+        name: Статус
+      - entity: "@ecoflow_ac"
+        name: AC вихід
+      - entity: "@ecoflow_dc"
+        name: DC 12V вихід
+
+  - type: history-graph
+    title: Потужність за 24 години
+    hours_to_show: 24
+    entities:
+      - entity: "@ecoflow_input"
+        name: Вхід
+      - entity: "@ecoflow_output"
+        name: Вихід
