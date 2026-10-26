@@ -31,3 +31,8 @@ if [ -f /opt/ha-dashboards/homelab.yaml ]; then
     python3 /opt/ha-tools/register-dashboard.py
     echo "Rendered Home Assistant dashboard: Homelab"
 fi
+
+# Packages are rendered into the existing /config volume, just like dashboard YAML.
+if [ -f /opt/ha-packages/mi_server_power.yaml ]; then
+    python3 /opt/ha-tools/register-power-package.py
+fi
