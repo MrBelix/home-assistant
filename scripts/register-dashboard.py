@@ -72,115 +72,98 @@ def match(entries: list[dict], domain: str, *suffixes: str) -> str | None:
     return None
 
 
-def ecoflow_view(entries: list[dict]) -> dict:
-    view: dict = {
-        "title": "EcoFlow",
-        "path": "power",
-        "icon": "mdi:battery-charging",
-        "cards": [{
-            "type": "markdown",
-            "content": "## EcoFlow River 2\nЖивлення та акумулятор",
-        }],
+# The Home Assistant YAML dashboard uses native !include for separate views.
+# The EcoFlow view is rendered from its own YAML template using actual entity ids.
+TEMPLATE_DIR = Path("/opt/ha-dashboards")
+
+
+def placeholder_entities(entries: list[dict]) -> dict[str, str | None]:
+    return {
+        "@ecoflow_battery": match(entries, "sensor", "battery level", "main battery level"),
+        "@ecoflow_input": match(entries, "sensor", "total in power"),
+        "@ecoflow_output": match(entries, "sensor", "total out power"),
+        "@ecoflow_remaining": match(entries, "sensor", "remaining time"),
+        "@ecoflow_health": match(entries, "sensor", "state of health"),
+        "@ecoflow_ac": match(entries, "switch", "ac enabled"),
+        "@ecoflow_dc": match(entries, "switch", "dc 12v enabled", "dc enabled"),
+        "@ecoflow_status": match(entries, "sensor", "main status", "status"),
     }
 
-    if not entries:
-        view["cards"].append({
-            "type": "markdown",
-            "content": "Сутності EcoFlow Cloud ще не знайдені. "
-                       "Підключи станцію в Home Assistant і перезапусти контейнер, "
-                       "щоб оновити цю вкладку.",
-        })
-        return view
 
-    battery = match(entries, "sensor", "battery level", "main battery level")
-    input_power = match(entries, "sensor", "total in power")
-    output_power = match(entries, "sensor", "total out power")
-    remaining = match(entries, "sensor", "remaining time")
-    health = match(entries, "sensor", "state of health")
-    ac = match(entries, "switch", "ac enabled")
-    dc = match(entries, "switch", "dc 12v enabled", "dc enabled")
-    status = match(entries, "sensor", "main status", "status")
+def resolve_entities(node, entities: dict[str, str | None]):
+    """Resolve @ecoflow_* placeholders; omit unavailable cards or entity rows."""
+    if isinstance(node, list):
+        return [
+            resolved
+            for value in node
+            if (resolved := resolve_entities(value, entities)) is not None
+        ]
+    if isinstance(node, dict):
+        obj = dict(node)
+        entity = obj.get("entity")
+        if isinstance(entity, str) and entity.startswith("@ecoflow_"):
+            actual = entities.get(entity)
+            if not actual:
+                return None
+            obj["entity"] = actual
 
-    if battery:
-        view["cards"].append({
-            "type": "gauge",
-            "entity": battery,
-            "name": "Заряд батареї",
-            "min": 0,
-            "max": 100,
-            "severity": {"red": 0, "yellow": 20, "green": 50},
-        })
+        for key in ("cards", "entities"):
+            if key in obj:
+                obj[key] = resolve_entities(obj[key], entities)
+                if not obj[key]:
+                    return None
+        return obj
+    return node
 
-    primary = [
-        (input_power, "Вхідна потужність"),
-        (output_power, "Споживання"),
-        (remaining, "Автономність"),
-        (health, "Стан батареї"),
-    ]
-    tiles = [{"type": "tile", "entity": entity, "name": name}
-             for entity, name in primary if entity]
-    if tiles:
-        view["cards"].append({"type": "grid", "columns": 2, "square": False, "cards": tiles})
 
-    secondary = [
-        {"entity": entity, "name": name}
-        for entity, name in [
-            (status, "Статус EcoFlow"),
-            (ac, "AC вихід"),
-            (dc, "DC 12V вихід"),
-        ] if entity
-    ]
-    if secondary:
-        view["cards"].append({
-            "type": "entities",
-            "title": "Керування та стан",
-            "show_header_toggle": False,
-            "entities": secondary,
-        })
-
-    if input_power and output_power:
-        view["cards"].append({
-            "type": "history-graph",
-            "title": "Потужність за 24 години",
-            "hours_to_show": 24,
-            "entities": [
-                {"entity": input_power, "name": "Вхід"},
-                {"entity": output_power, "name": "Вихід"},
-            ],
-        })
-    if not (battery or tiles or secondary):
-        view["cards"].append({
-            "type": "markdown",
-            "content": "Сутності EcoFlow є, але назви не розпізнано. "
-                       "Перевір їхні entity_id або додай їх вручну.",
-        })
-    print(
-        "Homelab: EcoFlow entities detected:",
-        ", ".join(x for x in [battery, input_power, output_power, remaining, health, ac, dc] if x),
-    )
-    return view
+def atomic_write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", prefix=".homelab-", dir=path.parent, delete=False
+    ) as temporary:
+        temporary.write(content)
+        temporary_name = temporary.name
+    os.chmod(temporary_name, 0o644)
+    if path.exists():
+        old_stat = path.stat()
+        os.chmod(temporary_name, stat.S_IMODE(old_stat.st_mode))
+        os.chown(temporary_name, old_stat.st_uid, old_stat.st_gid)
+    os.replace(temporary_name, path)
 
 
 def write_dashboard() -> None:
-    data = yaml.safe_load(TEMPLATE.read_text(encoding="utf-8"))
-    if not isinstance(data, dict) or not isinstance(data.get("views"), list):
-        raise ValueError("Invalid Git-managed dashboard template")
-    data["views"].append(ecoflow_view(ecoflow_entities()))
-    DASHBOARD_FILE.parent.mkdir(parents=True, exist_ok=True)
-    output = yaml.safe_dump(data, allow_unicode=True, sort_keys=False, width=100)
-    # Atomically replace generated dashboard without changing any user configuration.
-    with tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", prefix=".homelab-", dir=DASHBOARD_FILE.parent, delete=False
-    ) as temporary:
-        temporary.write(output)
-        temporary_name = temporary.name
-    os.chmod(temporary_name, 0o644)
-    if DASHBOARD_FILE.exists():
-        old_stat = DASHBOARD_FILE.stat()
-        os.chmod(temporary_name, stat.S_IMODE(old_stat.st_mode))
-        os.chown(temporary_name, old_stat.st_uid, old_stat.st_gid)
-    os.replace(temporary_name, DASHBOARD_FILE)
-    print("Homelab: dashboard updated from Git and the entity registry.")
+    # Source control owns YAML; no need to rewrite the server view in Python.
+    # Home Assistant resolves these !include directives when reading the dashboard.
+    atomic_write(
+        DASHBOARD_FILE,
+        (TEMPLATE_DIR / "homelab.yaml").read_text(encoding="utf-8"),
+    )
+    atomic_write(
+        CONFIG_DIR / "dashboards/views/server.yaml",
+        (TEMPLATE_DIR / "views/server.yaml").read_text(encoding="utf-8"),
+    )
+
+    ecoflow_template = yaml.safe_load(
+        (TEMPLATE_DIR / "views/ecoflow.yaml").read_text(encoding="utf-8")
+    )
+    if not isinstance(ecoflow_template, dict) or not isinstance(ecoflow_template.get("cards"), list):
+        raise ValueError("Invalid EcoFlow YAML view template")
+
+    entities = placeholder_entities(ecoflow_entities())
+    rendered = resolve_entities(ecoflow_template, entities)
+    if len(rendered["cards"]) == 1:
+        rendered["cards"].append({
+            "type": "markdown",
+            "content": "Сутності EcoFlow поки не знайдені. Перевір підключення та перезапусти Home Assistant.",
+        })
+    atomic_write(
+        CONFIG_DIR / "dashboards/views/ecoflow.yaml",
+        yaml.safe_dump(rendered, allow_unicode=True, sort_keys=False, width=100),
+    )
+    print(
+        "Homelab: views synced; EcoFlow entities:",
+        ", ".join(value for value in entities.values() if value) or "(none found)",
+    )
 
 
 def register_dashboard() -> None:
