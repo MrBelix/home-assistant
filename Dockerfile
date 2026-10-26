@@ -34,3 +34,7 @@ COPY --chmod=0755 scripts/sync-integrations.sh /etc/cont-init.d/10-sync-integrat
 # Version-controlled dashboard template and runtime registry-aware renderer.
 COPY dashboards/ /opt/ha-dashboards/
 COPY scripts/register-dashboard.py /opt/ha-tools/register-dashboard.py
+
+# Host AC-power sensor and dashboard stats (Home Assistant packages).
+COPY packages/ /opt/ha-packages/
+COPY scripts/register-power-package.py /opt/ha-tools/register-power-package.py
