@@ -102,6 +102,25 @@ views:
 
 Для зміни вигляду вкладок редагуй файли в Git, а не згенерований `/config/dashboards/views/ecoflow.yaml`. Після зміни в Git роби Deploy у Dokploy.
 
+## Контроль живлення ноутбука (Power)
+
+Система використовує **локальний** датчик `/sys/class/power_supply/ADP0/online` на Debian-хості `mi-server`. Він уже читається з контейнера Home Assistant. Жодного EcoFlow для виявлення відключень не потрібно.
+
+- `packages/mi_server_power.yaml` — `binary_sensor.mi_server_ac_power` через `command_line` (перевірка кожні **10 секунд**) і статистика `history_stats`: `sensor.mi_server_no_ac_hours_today` та `sensor.mi_server_no_ac_periods_today`.
+- `dashboards/views/power.yaml` — стан зовнішнього живлення, батарея ноутбука, години / періоди без адаптера сьогодні й графік за 24 години.
+- `scripts/register-power-package.py` — під час старту копіює конфіг у `/config/packages/mi_server_power.yaml` і, лише якщо це безпечно, додає `homeassistant.packages: !include_dir_named packages` до поточного `configuration.yaml`. Перед зміною створює `configuration.yaml.before-power-monitor`.
+
+Якщо в `configuration.yaml` уже є `homeassistant.packages` із нестандартним шляхом або непростий спосіб підключення `homeassistant:`, скрипт **не переписує** його. Перевір повідомлення в логах і додай вручну, якщо треба:
+
+```yaml
+homeassistant:
+  packages: !include_dir_named packages
+```
+
+Після Deploy перевір **Developer Tools → States**: `binary_sensor.mi_server_ac_power` має бути `on` (адаптер підключено), `off` (адаптера немає) або `unavailable` (помилка читання). Значення `unavailable` **не є** відключенням світла. Не випробовуй вручну без потреби: достатньо перевірки стану після деплою.
+
+**Увага:** сенсор відображає *наявність живлення на адаптері ноутбука*, а не гарантовано стан міської мережі. Якщо зарядний пристрій підключено через UPS, він покаже `on` навіть під час відключення світла. Home Assistant і сам ноутбук мають бути увімкнені для збору історії. Періоди, коли ноутбук вимкнений, не вимірюються.
+
 ## Оновлення
 
 Версії сторонніх інтеграцій закріплено commit SHA у `Dockerfile`. Для оновлення зміни відповідні `ARG`, перевір релізи та зроби новий деплой. Перезапуск контейнера також синхронізує код інтеграцій з образу, тож **не оновлюй ці дві інтеграції через HACS** — наступний запуск перезапише їх код.
@@ -118,12 +137,16 @@ views:
 │   ├── homelab.yaml
 │   └── views/
 │       ├── server.yaml
+│       ├── power.yaml
 │       └── ecoflow.yaml
+├── packages/
+│   └── mi_server_power.yaml
 ├── .env.example
 ├── .dockerignore
 └── scripts/
     ├── sync-integrations.sh
-    └── register-dashboard.py
+    ├── register-dashboard.py
+    └── register-power-package.py
 ```
 
 Цей репозиторій містить конфігурацію для деплою, **не самі дані Home Assistant**. Для відновлення після перевстановлення Debian обов'язкова окрема резервна копія `/config`.
