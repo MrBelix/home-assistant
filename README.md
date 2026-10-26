@@ -73,23 +73,23 @@ homelab-server:
 
 ### Окремі YAML-конфіги вкладок
 
-Вихідна конфігурація більше не є одним великим файлом. В Home Assistant використовуються нативні \`!include\` директиви:
+Вихідна конфігурація більше не є одним великим файлом. В Home Assistant використовуються нативні `!include` директиви:
 
-\`\`\`yaml
+```yaml
 # dashboards/homelab.yaml
 title: Homelab
 views:
   - !include views/server.yaml
   - !include views/ecoflow.yaml
-\`\`\`
+```
 
-- \`dashboards/views/server.yaml\` — усі картки Debian-ноутбука \`mi-server\`. Це звичайний YAML, його можна змінювати незалежно.
-- \`dashboards/views/ecoflow.yaml\` — окремі картки River 2. Значення \`@ecoflow_*\` у \`entity\` — це читабельні placeholders, які стартовий скрипт підставляє з реєстру Home Assistant. Якщо сенсор недоступний, відповідна картка приховується.
-- \`dashboards/homelab.yaml\` — лише назва та список вкладок.
+- `dashboards/views/server.yaml` — усі картки Debian-ноутбука `mi-server`. Це звичайний YAML, його можна змінювати незалежно.
+- `dashboards/views/ecoflow.yaml` — окремі картки River 2. Значення `@ecoflow_*` у `entity` — це читабельні placeholders, які стартовий скрипт підставляє з реєстру Home Assistant. Якщо сенсор недоступний, відповідна картка приховується.
+- `dashboards/homelab.yaml` — лише назва та список вкладок.
 
-З Docker-образу файли потрапляють у \`/config/dashboards/\`. Головний YAML розбирає сам Home Assistant через \`!include\`. Лише \`views/ecoflow.yaml\` перетворюється на конфіг із реальними \`entity_id\` під час запуску контейнера; збережені облікові дані не зачіпаються.
+З Docker-образу файли потрапляють у `/config/dashboards/`. Головний YAML розбирає сам Home Assistant через `!include`. Лише `views/ecoflow.yaml` перетворюється на конфіг із реальними `entity_id` під час запуску контейнера; збережені облікові дані не зачіпаються.
 
-Для зміни вигляду вкладок редагуй файли в Git, а не згенерований \`/config/dashboards/views/ecoflow.yaml\`. Після зміни в Git роби Deploy у Dokploy.
+Для зміни вигляду вкладок редагуй файли в Git, а не згенерований `/config/dashboards/views/ecoflow.yaml`. Після зміни в Git роби Deploy у Dokploy.
 
 ## Оновлення
 
