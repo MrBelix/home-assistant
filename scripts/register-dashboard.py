@@ -79,7 +79,7 @@ def ecoflow_view(entries: list[dict]) -> dict:
         "icon": "mdi:battery-charging",
         "cards": [{
             "type": "markdown",
-            "content": "## EcoFlow River 2\\nЖивлення та акумулятор",
+            "content": "## EcoFlow River 2\nЖивлення та акумулятор",
         }],
     }
 
@@ -190,8 +190,8 @@ def register_dashboard() -> None:
     original = CONFIG_FILE.read_text(encoding="utf-8")
 
     # Avoid corrupting configuration with a duplicate top-level lovelace key.
-    if re.search(r"(?m)^lovelace\\s*:", original):
-        if re.search(r"(?m)^\\s{4}homelab-server\\s*:", original):
+    if re.search(r"(?m)^lovelace\s*:", original):
+        if re.search(r"(?m)^\s{4}homelab-server\s*:", original):
             print("Homelab: dashboard already registered.")
         else:
             print(
@@ -204,7 +204,7 @@ def register_dashboard() -> None:
     if not backup.exists():
         shutil.copy2(CONFIG_FILE, backup)
 
-    updated = original.rstrip("\\n") + "\\n" + DASHBOARD_CONFIG
+    updated = original.rstrip("\n") + "\n" + DASHBOARD_CONFIG
     with tempfile.NamedTemporaryFile(
         mode="w", encoding="utf-8", prefix=".configuration-homelab-",
         dir=CONFIG_FILE.parent, delete=False
