@@ -174,6 +174,7 @@ def write_dashboard() -> None:
     ) as temporary:
         temporary.write(output)
         temporary_name = temporary.name
+    os.chmod(temporary_name, 0o644)
     if DASHBOARD_FILE.exists():
         old_stat = DASHBOARD_FILE.stat()
         os.chmod(temporary_name, stat.S_IMODE(old_stat.st_mode))
