@@ -50,8 +50,8 @@ def register_packages() -> None:
 
     # Existing users may have custom packages and a different include path.
     # Never silently replace it with our own include configuration.
-    if re.search(r"(?m)^\s{2}packages\s*:", original):
-        if re.search(r"(?m)^\s{2}packages\s*:\s*!include_dir_named\s+packages\s*(?:#.*)?$", original):
+    if re.search(r"(?m)^ {2}packages[ \t]*:", original):
+        if re.search(r"(?m)^ {2}packages[ \t]*:\s*!include_dir_named\s+packages\s*(?:#.*)?$", original):
             print("Homelab Power: packages/ already registered.")
         else:
             print(
