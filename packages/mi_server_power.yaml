@@ -1,0 +1,31 @@
+# Home Assistant package: track laptop AC adapter as local power signal.
+# ADP0/online is visible in Home Assistant's host-network Docker container.
+# This is adapter power, NOT proof of utility mains if the adapter is backed by a UPS.
+command_line:
+  - binary_sensor:
+      name: mi-server AC Power
+      unique_id: mi_server_ac_power
+      device_class: power
+      command: 'cat /sys/class/power_supply/ADP0/online'
+      payload_on: '1'
+      payload_off: '0'
+      availability: "{{ value in ['0', '1'] }}"
+      scan_interval: 10
+
+sensor:
+  - platform: history_stats
+    name: mi-server No AC Hours Today
+    unique_id: mi_server_no_ac_hours_today
+    entity_id: binary_sensor.mi_server_ac_power
+    state: 'off'
+    type: time
+    start: "{{ today_at('00:00') }}"
+    end: "{{ now() }}"
+  - platform: history_stats
+    name: mi-server No AC Periods Today
+    unique_id: mi_server_no_ac_periods_today
+    entity_id: binary_sensor.mi_server_ac_power
+    state: 'off'
+    type: count
+    start: "{{ today_at('00:00') }}"
+    end: "{{ now() }}"
