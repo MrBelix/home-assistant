@@ -2,4 +2,5 @@
 title: Homelab
 views:
   - !include views/server.yaml
+  - !include views/power.yaml
   - !include views/ecoflow.yaml
