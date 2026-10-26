@@ -80,6 +80,7 @@ def placeholder_entities(entries: list[dict]) -> dict[str, str | None]:
     return {
         "@ecoflow_battery": match(entries, "sensor", "battery level", "main battery level"),
         "@ecoflow_input": match(entries, "sensor", "total in power"),
+        "@ecoflow_ac_voltage": match(entries, "sensor", "ac in volts", "ac input voltage"),
         "@ecoflow_output": match(entries, "sensor", "total out power"),
         "@ecoflow_remaining": match(entries, "sensor", "remaining time"),
         "@ecoflow_health": match(entries, "sensor", "state of health"),
