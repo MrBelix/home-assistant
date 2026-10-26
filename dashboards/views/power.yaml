@@ -1,0 +1,42 @@
+title: Power
+path: power
+icon: mdi:transmission-tower
+type: masonry
+cards:
+  - type: markdown
+    content: |
+      ## Електроживлення ноутбука
+      Джерело: адаптер ADP0 на mi-server. Якщо адаптер живиться від UPS,
+      цей стан не визначає наявність електрики безпосередньо у квартирі.
+
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: tile
+        entity: binary_sensor.mi_server_ac_power
+        name: Живлення адаптера
+      - type: tile
+        entity: sensor.mi_server_battery
+        name: Батарея ноутбука
+
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: tile
+        entity: sensor.mi_server_no_ac_hours_today
+        name: Годин без адаптера сьогодні
+      - type: tile
+        entity: sensor.mi_server_no_ac_periods_today
+        name: Періодів без адаптера сьогодні
+
+  - type: history-graph
+    title: Зовнішнє живлення — останні 24 години
+    hours_to_show: 24
+    refresh_interval: 60
+    entities:
+      - entity: binary_sensor.mi_server_ac_power
+        name: Адаптер AC
+      - entity: sensor.mi_server_battery
+        name: Заряд ноутбука
