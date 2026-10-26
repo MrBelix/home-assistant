@@ -21,7 +21,6 @@ import yaml
 CONFIG_DIR = Path("/config")
 CONFIG_FILE = CONFIG_DIR / "configuration.yaml"
 REGISTRY_FILE = CONFIG_DIR / ".storage/core.entity_registry"
-TEMPLATE = Path("/opt/ha-dashboards/homelab.yaml")
 DASHBOARD_FILE = CONFIG_DIR / "dashboards/homelab.yaml"
 
 DASHBOARD_CONFIG = """
