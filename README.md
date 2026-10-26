@@ -47,7 +47,7 @@ docker inspect homeassistant --format '{{range .Mounts}}{{if eq .Destination "/c
 
 ## Homelab dashboard (Server + EcoFlow)
 
-Під час старту образ автоматично створює `/config/dashboards/homelab.yaml` із шаблону `dashboards/homelab.yaml` у цьому репозиторії. У дашборді є дві вкладки:
+Під час старту образ синхронізує розділені YAML-файли дашборда до `/config/dashboards/`. У дашборді є дві вкладки:
 
 - **mi-server** — CPU, RAM, диски, температура, батарея ноутбука, мережа, uptime, історія навантаження. Використовуються фактичні entity_id з твого Beszel.
 - **EcoFlow** — заряд, вхідна/вихідна потужність, залишок часу, здоров'я батареї, доступні AC/DC перемикачі й графік потужності. Entity ID автоматично знаходяться в реєстрі Home Assistant за інтеграцією `ecoflow_cloud`, тож їх не треба вручну копіювати.
@@ -71,6 +71,26 @@ homelab-server:
 
 Рекомендовано зробити резервну копію `/config` перед деплоєм; це також захистить збережені авторизації EcoFlow та Beszel.
 
+### Окремі YAML-конфіги вкладок
+
+Вихідна конфігурація більше не є одним великим файлом. В Home Assistant використовуються нативні \`!include\` директиви:
+
+\`\`\`yaml
+# dashboards/homelab.yaml
+title: Homelab
+views:
+  - !include views/server.yaml
+  - !include views/ecoflow.yaml
+\`\`\`
+
+- \`dashboards/views/server.yaml\` — усі картки Debian-ноутбука \`mi-server\`. Це звичайний YAML, його можна змінювати незалежно.
+- \`dashboards/views/ecoflow.yaml\` — окремі картки River 2. Значення \`@ecoflow_*\` у \`entity\` — це читабельні placeholders, які стартовий скрипт підставляє з реєстру Home Assistant. Якщо сенсор недоступний, відповідна картка приховується.
+- \`dashboards/homelab.yaml\` — лише назва та список вкладок.
+
+З Docker-образу файли потрапляють у \`/config/dashboards/\`. Головний YAML розбирає сам Home Assistant через \`!include\`. Лише \`views/ecoflow.yaml\` перетворюється на конфіг із реальними \`entity_id\` під час запуску контейнера; збережені облікові дані не зачіпаються.
+
+Для зміни вигляду вкладок редагуй файли в Git, а не згенерований \`/config/dashboards/views/ecoflow.yaml\`. Після зміни в Git роби Deploy у Dokploy.
+
 ## Оновлення
 
 Версії сторонніх інтеграцій закріплено commit SHA у `Dockerfile`. Для оновлення зміни відповідні `ARG`, перевір релізи та зроби новий деплой. Перезапуск контейнера також синхронізує код інтеграцій з образу, тож **не оновлюй ці дві інтеграції через HACS** — наступний запуск перезапише їх код.
@@ -84,7 +104,10 @@ homelab-server:
 ├── Dockerfile
 ├── compose.yaml
 ├── dashboards/
-│   └── homelab.yaml
+│   ├── homelab.yaml
+│   └── views/
+│       ├── server.yaml
+│       └── ecoflow.yaml
 ├── .env.example
 ├── .dockerignore
 └── scripts/
