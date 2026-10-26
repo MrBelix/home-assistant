@@ -32,5 +32,5 @@ COPY --from=integration_sources /src/beszel/custom_components/beszel/ /opt/ha-in
 COPY --chmod=0755 scripts/sync-integrations.sh /etc/cont-init.d/10-sync-integrations
 
 # Version-controlled dashboard template and runtime registry-aware renderer.
-COPY dashboards/homelab.yaml /opt/ha-dashboards/homelab.yaml
+COPY dashboards/ /opt/ha-dashboards/
 COPY scripts/register-dashboard.py /opt/ha-tools/register-dashboard.py
