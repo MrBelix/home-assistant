@@ -23,13 +23,13 @@ HACS **не потрібен** для цих інтеграцій і не вст
 docker inspect homeassistant --format '{{range .Mounts}}{{if eq .Destination "/config"}}{{.Type}} | {{.Name}} | {{.Source}}{{end}}{{end}}'
 ```
 
-- Якщо це `volume`, скопіюй **точне** значення `Name` у змінну `HA_CONFIG_VOLUME` у Dokploy. Наведений `compose.yaml` використовує **external volume** та навмисно не створить порожній том при помилці в назві.
+- Якщо це `volume`, скопіюй **точне** значення `Name` у змінну `HA_CONFIG_VOLUME` у Dokploy. Наведений `compose.yml` використовує **external volume** та навмисно не створить порожній том при помилці в назві.
 - Якщо це `bind`, не використовуй цей Compose без адаптації: заміни монтування `ha_config:/config` на **той самий наявний абсолютний шлях** `/existing/host/path:/config`, а декларацію `ha_config` унизу прибери.
 
 ## Деплой через Dokploy
 
 1. Відкрий **існуючий** Docker Compose-сервіс Home Assistant у Dokploy.
-2. Прив'яжи Git-репозиторій `MrBelix/home-assistant`, гілку `main`, Compose Path: `./compose.yaml`.
+2. Прив'яжи Git-репозиторій `MrBelix/home-assistant`, гілку `main`, Compose Path: `./compose.yml`.
 3. Якщо `/config` — Docker volume, у **Environment** задай `HA_CONFIG_VOLUME` зі значенням з команди вище. У Dokploy може бути змінна `HA_CONFIG_VOLUME=...` у конфігурації середовища сервісу.
 4. Переконайся, що застосунок має доступ до Docker build у режимі **Docker Compose**, а не Swarm **Stack**.
 5. Зроби резервну копію `/config`, лише потім виконуй **Deploy**.
@@ -56,7 +56,7 @@ docker inspect homeassistant --format '{{range .Mounts}}{{if eq .Destination "/c
 ```text
 .
 ├── Dockerfile
-├── compose.yaml
+├── compose.yml
 ├── .env.example
 ├── .dockerignore
 └── scripts/
