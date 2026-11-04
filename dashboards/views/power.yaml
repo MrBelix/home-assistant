@@ -1,42 +1,230 @@
-title: Power
+# Power outage statistics. Source signal: laptop AC adapter (ADP0) on mi-server,
+# see packages/mi_server_power.yaml for all sensors used here.
+title: Світло
 path: power
-icon: mdi:transmission-tower
-type: masonry
-cards:
-  - type: markdown
-    content: |
-      ## Електроживлення ноутбука
-      Джерело: адаптер ADP0 на mi-server. Якщо адаптер живиться від UPS,
-      цей стан не визначає наявність електрики безпосередньо у квартирі.
-
+icon: mdi:lightbulb-on-outline
+type: sections
+max_columns: 3
+sections:
+  # ── Now ───────────────────────────────────────────────────────────────────
   - type: grid
-    columns: 2
-    square: false
     cards:
-      - type: tile
-        entity: binary_sensor.mi_server_ac_power
-        name: Живлення адаптера
-      - type: tile
-        entity: sensor.mi_server_battery
-        name: Батарея ноутбука
+      - type: heading
+        heading: Зараз
+        icon: mdi:transmission-tower
 
+      - type: markdown
+        content: |-
+          {%- macro hm(hours) -%}
+          {%- set m = (hours | float(0) * 60) | round(0) | int -%}
+          {%- if m >= 60 -%}{{ m // 60 }} год{% if m % 60 %} {{ m % 60 }} хв{% endif %}{%- else -%}{{ m }} хв{%- endif -%}
+          {%- endmacro -%}
+          {%- macro when(dt) -%}
+          {%- set local = as_local(dt) -%}
+          {{ local.strftime('%H:%M') if local.date() == now().date() else local.strftime('%d.%m о %H:%M') }}
+          {%- endmacro -%}
+          {%- set ac = 'binary_sensor.mi_server_ac_power' -%}
+          {%- set st = states(ac) -%}
+          {%- set pending = state_attr('sensor.mi_server_last_outage_duration', 'pending_start') -%}
+          {%- set restore = states('sensor.mi_server_last_power_restore') -%}
+          {%- if st == 'off' -%}
+          {%- set since = as_datetime(pending) if pending else states[ac].last_changed -%}
+          ## 🕯️ Світла немає
+
+          **вже {{ hm((now() - since).total_seconds() / 3600) }}** · зникло {{ when(since) }}
+          {%- elif st == 'on' -%}
+          {%- set since = as_datetime(restore) if restore not in ['unknown', 'unavailable'] else states[ac].last_changed -%}
+          ## 💡 Світло є
+
+          **вже {{ hm((now() - since).total_seconds() / 3600) }}** · з {{ when(since) }}
+          {%- else -%}
+          ## ❔ Немає даних
+
+          Датчик адаптера недоступний — це **не** означає відключення.
+          {%- endif %}
+
+          {% set last = states('sensor.mi_server_last_outage_duration') -%}
+          {%- if last | is_number -%}
+          Останнє відключення: **{{ hm(last | float / 60) }}**
+          ({{ when(as_datetime(state_attr('sensor.mi_server_last_outage_duration', 'started'))) }} –
+          {{ when(as_datetime(state_attr('sensor.mi_server_last_outage_duration', 'ended'))) }})
+          {%- endif %}
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: tile
+            entity: binary_sensor.mi_server_ac_power
+            name: Адаптер AC
+          - type: tile
+            entity: sensor.mi_server_battery
+            name: Батарея ноутбука
+
+  # ── Summary ───────────────────────────────────────────────────────────────
   - type: grid
-    columns: 2
-    square: false
     cards:
-      - type: tile
-        entity: sensor.mi_server_no_ac_hours_today
-        name: Годин без адаптера сьогодні
-      - type: tile
-        entity: sensor.mi_server_no_ac_periods_today
-        name: Періодів без адаптера сьогодні
+      - type: heading
+        heading: Скільки не було світла
+        icon: mdi:timer-off-outline
 
-  - type: history-graph
-    title: Зовнішнє живлення — останні 24 години
-    hours_to_show: 24
-    refresh_interval: 60
-    entities:
-      - entity: binary_sensor.mi_server_ac_power
-        name: Адаптер AC
-      - entity: sensor.mi_server_battery
-        name: Заряд ноутбука
+      - type: markdown
+        content: |-
+          {%- macro hm(hours) -%}
+          {%- set m = (hours | float(0) * 60) | round(0) | int -%}
+          {%- if m == 0 -%}—{%- elif m >= 60 -%}{{ m // 60 }} год{% if m % 60 %} {{ m % 60 }} хв{% endif %}{%- else -%}{{ m }} хв{%- endif -%}
+          {%- endmacro -%}
+          {%- macro pct(hours, total) -%}
+          {{ (hours | float(0) / total * 100) | round(0) | int }}%
+          {%- endmacro -%}
+          {%- set elapsed = (now() - today_at('00:00')).total_seconds() / 3600 -%}
+          {%- set rows = [
+            ('Сьогодні', 'sensor.mi_server_no_ac_hours_today', 'sensor.mi_server_no_ac_periods_today', [elapsed, 0.01] | max),
+            ('За 24 год', 'sensor.mi_server_no_ac_hours_24h', 'sensor.mi_server_no_ac_periods_24h', 24),
+            ('Вчора', 'sensor.mi_server_no_ac_hours_yesterday', 'sensor.mi_server_no_ac_periods_yesterday', 24),
+            ('За 7 днів', 'sensor.mi_server_no_ac_hours_7d', 'sensor.mi_server_no_ac_periods_7d', 168),
+          ] -%}
+          | Період | Без світла | Частка | Відключень |
+          |:--|--:|--:|--:|
+          {% for label, hours, count, total in rows -%}
+          | {{ label }} | **{{ hm(states(hours)) }}** | {{ pct(states(hours), total) }} | {{ states(count) | int(0) }} |
+          {% endfor %}
+
+          {% set h7 = states('sensor.mi_server_no_ac_hours_7d') | float(0) -%}
+          {%- set n7 = states('sensor.mi_server_no_ac_periods_7d') | int(0) -%}
+          {%- set longest = states('sensor.mi_server_longest_outage_today') -%}
+          {%- if n7 > 0 -%}
+          Середнє відключення за 7 днів: **{{ hm(h7 / n7) }}**
+          {%- endif %}
+          {%- if longest | is_number and longest | int > 0 %}
+          · найдовше сьогодні: **{{ hm(longest | float / 60) }}**
+          {%- endif %}
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: gauge
+            entity: sensor.mi_server_ac_availability_24h
+            name: Світло · 24 год
+            min: 0
+            max: 100
+            severity:
+              red: 0
+              yellow: 60
+              green: 90
+          - type: gauge
+            entity: sensor.mi_server_ac_availability_7d
+            name: Світло · 7 днів
+            min: 0
+            max: 100
+            severity:
+              red: 0
+              yellow: 60
+              green: 90
+
+      # Long-term statistics: these grow from the moment the sensors became
+      # total_increasing and are never purged by Recorder.
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: statistic
+            entity: sensor.mi_server_no_ac_hours_today
+            name: Цей тиждень
+            stat_type: change
+            period:
+              calendar:
+                period: week
+          - type: statistic
+            entity: sensor.mi_server_no_ac_hours_today
+            name: Цей місяць
+            stat_type: change
+            period:
+              calendar:
+                period: month
+          - type: statistic
+            entity: sensor.mi_server_no_ac_hours_today
+            name: Минулий місяць
+            stat_type: change
+            period:
+              calendar:
+                period: month
+                offset: -1
+
+  # ── Charts ────────────────────────────────────────────────────────────────
+  - type: grid
+    column_span: 3
+    cards:
+      - type: heading
+        heading: Графіки
+        icon: mdi:chart-bar
+
+      - type: statistics-graph
+        title: Годин без світла по днях
+        entities:
+          - entity: sensor.mi_server_no_ac_hours_today
+            name: Без світла, год
+        stat_types:
+          - change
+        period: day
+        days_to_show: 30
+        chart_type: bar
+        hide_legend: true
+        grid_options:
+          columns: full
+
+      - type: history-graph
+        title: Коли було світло · 48 годин
+        hours_to_show: 48
+        entities:
+          - entity: binary_sensor.mi_server_ac_power
+            name: Світло
+        grid_options:
+          columns: full
+
+      - type: statistics-graph
+        title: Кількість відключень по днях
+        entities:
+          - entity: sensor.mi_server_no_ac_periods_today
+            name: Відключень
+        stat_types:
+          - change
+        period: day
+        days_to_show: 14
+        chart_type: bar
+        hide_legend: true
+        grid_options:
+          columns: full
+
+      - type: history-graph
+        title: Світло за тиждень
+        hours_to_show: 168
+        entities:
+          - entity: binary_sensor.mi_server_ac_power
+            name: Світло
+        grid_options:
+          columns: full
+
+      - type: statistics-graph
+        title: Годин без світла по місяцях
+        entities:
+          - entity: sensor.mi_server_no_ac_hours_today
+            name: Без світла, год
+        stat_types:
+          - change
+        period: month
+        days_to_show: 365
+        chart_type: bar
+        hide_legend: true
+        grid_options:
+          columns: full
+
+      - type: markdown
+        content: >-
+          Джерело — адаптер ADP0 на mi-server, опитування кожні 10 с.
+          Якщо ноутбук живиться через UPS/EcoFlow, відключення тут не видно.
+          `Немає даних` / розриви — це вимкнений ноутбук або HA, а не відключення.
+          Денні та місячні стовпчики накопичуються з моменту деплою цієї версії.
+        grid_options:
+          columns: full
