@@ -12,13 +12,20 @@ command_line:
       availability: "{{ value in ['0', '1'] }}"
       scan_interval: 10
 
+# history_stats recalculates from Recorder history, so the rolling windows below
+# also cover outages recorded before this file was deployed (default Recorder
+# retention is 10 days — enough for the 7-day window).
 sensor:
+  # "Today" counters reset at midnight. total_increasing makes Home Assistant
+  # keep long-term statistics (never purged), so dashboards can show daily /
+  # weekly / monthly sums with the statistics-graph and statistic cards.
   - platform: history_stats
     name: mi-server No AC Hours Today
     unique_id: mi_server_no_ac_hours_today
     entity_id: binary_sensor.mi_server_ac_power
     state: 'off'
     type: time
+    state_class: total_increasing
     start: "{{ today_at('00:00') }}"
     end: "{{ now() }}"
   - platform: history_stats
@@ -27,5 +34,180 @@ sensor:
     entity_id: binary_sensor.mi_server_ac_power
     state: 'off'
     type: count
+    state_class: total_increasing
     start: "{{ today_at('00:00') }}"
     end: "{{ now() }}"
+
+  # Rolling 24 hours (not calendar day).
+  - platform: history_stats
+    name: mi-server No AC Hours 24h
+    unique_id: mi_server_no_ac_hours_24h
+    entity_id: binary_sensor.mi_server_ac_power
+    state: 'off'
+    type: time
+    end: "{{ now() }}"
+    duration:
+      hours: 24
+  - platform: history_stats
+    name: mi-server No AC Periods 24h
+    unique_id: mi_server_no_ac_periods_24h
+    entity_id: binary_sensor.mi_server_ac_power
+    state: 'off'
+    type: count
+    end: "{{ now() }}"
+    duration:
+      hours: 24
+
+  # Previous calendar day.
+  - platform: history_stats
+    name: mi-server No AC Hours Yesterday
+    unique_id: mi_server_no_ac_hours_yesterday
+    entity_id: binary_sensor.mi_server_ac_power
+    state: 'off'
+    type: time
+    start: "{{ today_at('00:00') - timedelta(days=1) }}"
+    end: "{{ today_at('00:00') }}"
+  - platform: history_stats
+    name: mi-server No AC Periods Yesterday
+    unique_id: mi_server_no_ac_periods_yesterday
+    entity_id: binary_sensor.mi_server_ac_power
+    state: 'off'
+    type: count
+    start: "{{ today_at('00:00') - timedelta(days=1) }}"
+    end: "{{ today_at('00:00') }}"
+
+  # Rolling 7 days.
+  - platform: history_stats
+    name: mi-server No AC Hours 7d
+    unique_id: mi_server_no_ac_hours_7d
+    entity_id: binary_sensor.mi_server_ac_power
+    state: 'off'
+    type: time
+    end: "{{ now() }}"
+    duration:
+      days: 7
+  - platform: history_stats
+    name: mi-server No AC Periods 7d
+    unique_id: mi_server_no_ac_periods_7d
+    entity_id: binary_sensor.mi_server_ac_power
+    state: 'off'
+    type: count
+    end: "{{ now() }}"
+    duration:
+      days: 7
+
+# Trigger-based template sensors restore their state after a restart, so the
+# last outage survives HA restarts. Each sensor only reads its own previous
+# state (`this`), which avoids ordering races between sensors.
+template:
+  # Share of time with power. Computed from the "hours without power" sensors
+  # (not history_stats ratio), so periods without data are not counted as outages.
+  - sensor:
+      - name: mi-server AC Availability 24h
+        unique_id: mi_server_ac_availability_24h
+        unit_of_measurement: '%'
+        state_class: measurement
+        icon: mdi:lightbulb-on-outline
+        availability: "{{ states('sensor.mi_server_no_ac_hours_24h') | is_number }}"
+        state: >
+          {{ (100 - states('sensor.mi_server_no_ac_hours_24h') | float / 24 * 100) | round(1) }}
+      - name: mi-server AC Availability 7d
+        unique_id: mi_server_ac_availability_7d
+        unit_of_measurement: '%'
+        state_class: measurement
+        icon: mdi:lightbulb-on-outline
+        availability: "{{ states('sensor.mi_server_no_ac_hours_7d') | is_number }}"
+        state: >
+          {{ (100 - states('sensor.mi_server_no_ac_hours_7d') | float / 168 * 100) | round(1) }}
+
+  - triggers:
+      - trigger: state
+        entity_id: binary_sensor.mi_server_ac_power
+        from: 'on'
+        to: 'off'
+    sensor:
+      - name: mi-server Last Outage Start
+        unique_id: mi_server_last_outage_start
+        device_class: timestamp
+        icon: mdi:power-plug-off
+        state: "{{ now().isoformat() }}"
+
+  - triggers:
+      - trigger: state
+        entity_id: binary_sensor.mi_server_ac_power
+        from: 'off'
+        to: 'on'
+    sensor:
+      - name: mi-server Last Power Restore
+        unique_id: mi_server_last_power_restore
+        device_class: timestamp
+        icon: mdi:power-plug
+        state: "{{ now().isoformat() }}"
+
+  # Duration of the last finished outage, in minutes.
+  # Attributes: started / ended of that outage; pending_start while it is ongoing.
+  - triggers:
+      - trigger: state
+        entity_id: binary_sensor.mi_server_ac_power
+        from: 'on'
+        to: 'off'
+        id: outage
+      - trigger: state
+        entity_id: binary_sensor.mi_server_ac_power
+        from: 'off'
+        to: 'on'
+        id: restore
+    sensor:
+      - name: mi-server Last Outage Duration
+        unique_id: mi_server_last_outage_duration
+        device_class: duration
+        unit_of_measurement: min
+        icon: mdi:timer-off-outline
+        state: >
+          {% if trigger.id == 'restore' %}
+            {% set pending = this.attributes.get('pending_start') %}
+            {% set start = as_datetime(pending) if pending else trigger.from_state.last_changed %}
+            {{ ((now() - start).total_seconds() / 60) | round(0) | int }}
+          {% else %}
+            {{ this.state if this.state | is_number else none }}
+          {% endif %}
+        attributes:
+          pending_start: >
+            {{ now().isoformat() if trigger.id == 'outage' else '' }}
+          started: >
+            {% if trigger.id == 'restore' %}
+              {% set pending = this.attributes.get('pending_start') %}
+              {{ pending if pending else trigger.from_state.last_changed.isoformat() }}
+            {% else %}
+              {{ this.attributes.get('started') }}
+            {% endif %}
+          ended: >
+            {{ now().isoformat() if trigger.id == 'restore' else this.attributes.get('ended') }}
+
+  # Longest finished outage of the current day, in minutes.
+  - triggers:
+      - trigger: state
+        entity_id: sensor.mi_server_last_outage_duration
+        attribute: ended
+        id: finished
+      - trigger: time
+        at: '00:00:00'
+        id: reset
+    sensor:
+      - name: mi-server Longest Outage Today
+        unique_id: mi_server_longest_outage_today
+        device_class: duration
+        unit_of_measurement: min
+        icon: mdi:timer-alert-outline
+        state: >
+          {% if trigger.id == 'reset' %}
+            0
+          {% else %}
+            {% set same_day = this.attributes.get('day') == now().date().isoformat() %}
+            {% set current = this.state | int(0) if same_day else 0 %}
+            {# from_state is none when the sensor is only restored on HA startup #}
+            {% set latest = trigger.to_state.state | int(0) if trigger.from_state is not none else 0 %}
+            {{ [current, latest] | max }}
+          {% endif %}
+        attributes:
+          day: "{{ now().date().isoformat() }}"
