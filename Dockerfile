@@ -4,7 +4,7 @@ ARG HOME_ASSISTANT_IMAGE=ghcr.io/home-assistant/home-assistant:stable
 
 FROM alpine:3.22 AS integration_sources
 
-RUN apk add --no-cache ca-certificates curl tar
+RUN apk add --no-cache ca-certificates curl tar patch
 
 # EcoFlow Cloud v1.7.2
 ARG ECOFLOW_COMMIT=de02d680cdfe1adcec60c43047ff3ed3da15e0ee
@@ -21,6 +21,15 @@ RUN set -eux; \
       | tar -xz -C /src/beszel --strip-components=1; \
     test -f /src/ecoflow/custom_components/ecoflow_cloud/manifest.json; \
     test -f /src/beszel/custom_components/beszel/manifest.json
+
+# Local fixes for upstream bugs not yet released. A patch that no longer applies
+# (e.g. after bumping ECOFLOW_COMMIT to a release that already has the fix)
+# fails the build on purpose: delete that patch file then.
+COPY patches/ecoflow_cloud/ /patches/ecoflow_cloud/
+RUN set -eux; \
+    for p in /patches/ecoflow_cloud/*.patch; do \
+      patch --directory=/src/ecoflow --strip=1 --forward --batch < "$p"; \
+    done
 
 FROM ${HOME_ASSISTANT_IMAGE}
 

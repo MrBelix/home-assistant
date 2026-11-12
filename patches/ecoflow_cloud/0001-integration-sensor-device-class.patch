@@ -1,0 +1,26 @@
+HA 2026.11: pass device_class to IntegrationSensor.__init__ (required keyword-only argument).
+Upstream: https://github.com/tolwi/hassio-ecoflow-cloud/issues/964 — drop this patch once a release includes the fix.
+
+--- a/custom_components/ecoflow_cloud/sensor.py
++++ b/custom_components/ecoflow_cloud/sensor.py
+@@ -59,6 +59,11 @@
+ 
+ # HA 2025.8 added a `hass` argument to IntegrationSensor.__init__ and 2026.8 removed it again
+ _INTEGRATION_SENSOR_TAKES_HASS = "hass" in inspect.signature(IntegrationSensor.__init__).parameters
++# HA 2026.11 made `device_class` a required keyword-only argument of IntegrationSensor.__init__
++# (tolwi/hassio-ecoflow-cloud#964); older cores do not accept it.
++_INTEGRATION_SENSOR_TAKES_DEVICE_CLASS = (
++    "device_class" in inspect.signature(IntegrationSensor.__init__).parameters
++)
+ 
+ 
+ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+@@ -853,6 +858,8 @@
+ 
+     def __init__(self, base: WattsSensorEntity, enabled_default: bool = True):
+         version_kwargs: dict[str, Any] = {"hass": base.coordinator.hass} if _INTEGRATION_SENSOR_TAKES_HASS else {}
++        if _INTEGRATION_SENSOR_TAKES_DEVICE_CLASS:
++            version_kwargs["device_class"] = SensorDeviceClass.ENERGY
+         super().__init__(
+             **version_kwargs,
+             integration_method="left",

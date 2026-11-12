@@ -124,6 +124,14 @@ homeassistant:
 
 Тег базового Home Assistant за замовчуванням — `stable`, він може змінюватися з часом. Якщо потрібна повна повторюваність, зафіксуй конкретний версійний тег або digest базового образу.
 
+### Локальні патчі інтеграцій
+
+Якщо в релізі інтеграції є баг, який ламає її на поточному Home Assistant, а виправлення ще не випущено, патч кладемо в `patches/<інтеграція>/*.patch`. Під час build вони накладаються на код із закріпленого commit.
+
+- `patches/ecoflow_cloud/0001-integration-sensor-device-class.patch` — HA 2026.11 зробив `device_class` обов'язковим аргументом `IntegrationSensor.__init__`, через що в EcoFlow 1.7.2 падала вся sensor-платформа (`missing 1 required keyword-only argument: 'device_class'`). Upstream: [tolwi/hassio-ecoflow-cloud#964](https://github.com/tolwi/hassio-ecoflow-cloud/issues/964). Патч сумісний і зі старішими версіями HA.
+
+Коли оновлюєш `ECOFLOW_COMMIT` до релізу, що вже містить виправлення, build навмисно впаде на кроці `patch` — тоді просто видали відповідний файл патча.
+
 ## Структура
 
 ```text
@@ -138,6 +146,9 @@ homeassistant:
 │       └── ecoflow.yaml
 ├── packages/
 │   └── mi_server_power.yaml
+├── patches/
+│   └── ecoflow_cloud/
+│       └── 0001-integration-sensor-device-class.patch
 ├── .env.example
 ├── .dockerignore
 └── scripts/
